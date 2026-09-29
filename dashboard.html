@@ -1,0 +1,2177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous Microgrid Energy Management — SCADA Control & Multi-Agent Operations</title>
+    <!-- Google Fonts: Space Grotesk + JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Industrial SCADA Control Room Tokens */
+            --bg-deep: #070A11;
+            --bg-surface: #0E1424;
+            --bg-elevated: #141D33;
+            --bg-inset: #090D18;
+            --border-default: rgba(255, 255, 255, 0.08);
+            --border-subtle: rgba(255, 255, 255, 0.04);
+            --border-active: rgba(0, 229, 255, 0.4);
+            --border-amber: rgba(245, 158, 11, 0.4);
+
+            /* Domain Color World */
+            --solar-gold: #F59E0B;
+            --solar-light: #FDE68A;
+            --p2p-cyan: #00E5FF;
+            --p2p-blue: #0284C7;
+            --battery-green: #10B981;
+            --battery-light: #6EE7B7;
+            --grid-red: #EF4444;
+            --grid-rose: #F43F5E;
+            --fipa-purple: #A855F7;
+            --neutral-white: #F8FAFC;
+            --neutral-slate: #94A3B8;
+            --neutral-dim: #64748B;
+
+            /* Typography */
+            --font-display: 'Space Grotesk', system-ui, sans-serif;
+            --font-body: 'Inter', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            /* Radii */
+            --r-lg: 16px;
+            --r-md: 10px;
+            --r-sm: 6px;
+            --r-pill: 9999px;
+
+            /* Shadows & Depth */
+            --shadow-card: 0 4px 24px -1px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            --shadow-glow-cyan: 0 0 20px rgba(0, 229, 255, 0.2);
+            --shadow-glow-amber: 0 0 20px rgba(245, 158, 11, 0.2);
+            --shadow-glow-green: 0 0 20px rgba(16, 185, 129, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--bg-deep);
+            background-image: 
+                radial-gradient(circle at 20% 10%, rgba(0, 229, 255, 0.03) 0%, transparent 45%),
+                radial-gradient(circle at 80% 90%, rgba(16, 185, 129, 0.03) 0%, transparent 45%),
+                linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+            color: var(--neutral-white);
+            line-height: 1.5;
+            padding-bottom: 150px;
+            -webkit-font-smoothing: antialiased;
+            min-height: 100vh;
+        }
+
+        /* Top Executive Header */
+        header.scada-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(11, 16, 28, 0.9);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-default);
+            padding: 12px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-badge-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--r-md);
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(14, 165, 233, 0.4));
+            border: 1px solid var(--border-active);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            box-shadow: var(--shadow-glow-cyan);
+        }
+
+        .brand-titles h1 {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-titles p {
+            font-size: 0.78rem;
+            color: var(--neutral-slate);
+            font-family: var(--font-mono);
+            letter-spacing: 0.03em;
+        }
+
+        .pulse-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 10px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            border-radius: var(--r-pill);
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--battery-green);
+            font-family: var(--font-mono);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .pulse-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--battery-green);
+            box-shadow: 0 0 10px var(--battery-green);
+            animation: pulse-ring 1.8s infinite;
+        }
+
+        @keyframes pulse-ring {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* Header Operation Controls */
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .scenario-select-wrap {
+            position: relative;
+        }
+
+        select.scada-dropdown {
+            font-family: var(--font-display);
+            padding: 8px 16px;
+            border-radius: var(--r-md);
+            border: 1px solid var(--border-default);
+            background: var(--bg-surface);
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--neutral-white);
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        select.scada-dropdown:focus {
+            border-color: var(--p2p-cyan);
+            box-shadow: var(--shadow-glow-cyan);
+        }
+
+        .segmented-mode-switch {
+            display: flex;
+            background: var(--bg-inset);
+            border: 1px solid var(--border-default);
+            border-radius: var(--r-md);
+            padding: 3px;
+        }
+
+        .mode-btn {
+            font-family: var(--font-display);
+            padding: 7px 16px;
+            border-radius: calc(var(--r-md) - 2px);
+            border: none;
+            background: transparent;
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--neutral-dim);
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 0.02em;
+        }
+
+        .mode-btn.active#mode-greedy {
+            background: linear-gradient(135deg, #1E293B, #334155);
+            color: #FFFFFF;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .mode-btn.active#mode-astar {
+            background: linear-gradient(135deg, #065F46, #059669);
+            color: #FFFFFF;
+            box-shadow: 0 2px 12px rgba(16, 185, 129, 0.35);
+        }
+
+        /* Container Layout */
+        .scada-container {
+            max-width: 1540px;
+            margin: 0 auto;
+            padding: 24px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+
+        /* System Shock Alert Banner */
+        .shock-callout-banner {
+            display: none;
+            padding: 12px 20px;
+            border-radius: var(--r-md);
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.08));
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 0 25px rgba(239, 68, 68, 0.15);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .shock-callout-banner.active {
+            display: flex;
+        }
+
+        .shock-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .shock-icon-alert {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid var(--grid-red);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--grid-red);
+            font-size: 1.1rem;
+            animation: pulse-ring 1.2s infinite;
+        }
+
+        .shock-desc-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #FFFFFF;
+        }
+
+        .shock-desc-body {
+            font-size: 0.8rem;
+            color: var(--neutral-slate);
+        }
+
+        /* Quick Shock Injection Trigger Bar */
+        .shock-inject-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 18px;
+            background: rgba(20, 29, 51, 0.6);
+            border: 1px solid var(--border-default);
+            border-radius: var(--r-md);
+            font-size: 0.8rem;
+        }
+
+        .shock-inject-row span.label {
+            font-family: var(--font-mono);
+            font-weight: 700;
+            color: var(--neutral-dim);
+            text-transform: uppercase;
+            font-size: 0.72rem;
+            letter-spacing: 0.05em;
+        }
+
+        .shock-trigger-btn {
+            padding: 5px 12px;
+            border-radius: var(--r-sm);
+            border: 1px solid var(--border-default);
+            background: rgba(14, 20, 36, 0.8);
+            color: var(--neutral-white);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .shock-trigger-btn:hover {
+            border-color: var(--p2p-cyan);
+            background: rgba(0, 229, 255, 0.1);
+        }
+
+        .shock-trigger-btn.active {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: var(--grid-red);
+            color: #FFFFFF;
+        }
+
+        /* Hero Mimic Board + Telemetry Layout */
+        .scada-main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 22px;
+        }
+
+        /* SCADA Card */
+        .scada-card {
+            background: var(--bg-surface);
+            border-radius: var(--r-lg);
+            border: 1px solid var(--border-default);
+            padding: 20px 24px;
+            box-shadow: var(--shadow-card);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .card-topbar-title {
+            font-family: var(--font-display);
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: var(--neutral-slate);
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* 4 Key Industrial Gauges */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+
+        .kpi-stat-box {
+            background: var(--bg-surface);
+            border-radius: var(--r-md);
+            border: 1px solid var(--border-default);
+            padding: 16px 18px;
+            box-shadow: var(--shadow-card);
+            position: relative;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .kpi-stat-box:hover {
+            transform: translateY(-2px);
+            border-color: var(--border-active);
+        }
+
+        .kpi-stat-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+        }
+
+        .kpi-stat-box.cost::before { background: var(--solar-gold); }
+        .kpi-stat-box.import::before { background: var(--grid-rose); }
+        .kpi-stat-box.p2p::before { background: var(--p2p-cyan); }
+        .kpi-stat-box.unmet::before { background: var(--battery-green); }
+
+        .kpi-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--neutral-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .kpi-number-wrap {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .kpi-number {
+            font-family: var(--font-mono);
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--neutral-white);
+        }
+
+        .kpi-unit {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            color: var(--neutral-dim);
+            font-weight: 600;
+        }
+
+        .kpi-subtext {
+            font-size: 0.75rem;
+            color: var(--neutral-dim);
+            margin-top: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Cyber-Physical Electrical Mimic Board */
+        .mimic-schematic-wrap {
+            position: relative;
+            width: 100%;
+            height: 495px;
+            background: radial-gradient(circle at center, rgba(16, 24, 44, 0.7) 0%, rgba(9, 13, 24, 0.95) 100%);
+            border-radius: var(--r-md);
+            border: 1px solid var(--border-default);
+            overflow: hidden;
+        }
+
+        /* FIPA Message Console & Negotiation Drawer */
+        .fipa-console-wrap {
+            display: flex;
+            flex-direction: column;
+            height: 495px;
+            background: var(--bg-inset);
+            border-radius: var(--r-md);
+            border: 1px solid var(--border-default);
+            overflow: hidden;
+            font-family: var(--font-mono);
+        }
+
+        .fipa-header-bar {
+            padding: 12px 16px;
+            background: rgba(16, 24, 44, 0.9);
+            border-bottom: 1px solid var(--border-default);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .fipa-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--p2p-cyan);
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .fipa-terminal-dots {
+            display: flex;
+            gap: 5px;
+        }
+
+        .dot-term {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .dot-term.red { background: #EF4444; }
+        .dot-term.yellow { background: #F59E0B; }
+        .dot-term.green { background: #10B981; }
+
+        .fipa-feed {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 0.78rem;
+            line-height: 1.6;
+        }
+
+        .fipa-feed::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .fipa-feed::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .fipa-msg-row {
+            padding: 8px 12px;
+            border-radius: var(--r-sm);
+            background: rgba(20, 29, 51, 0.4);
+            border-left: 3px solid var(--fipa-purple);
+            animation: fadeIn 0.25s ease;
+        }
+
+        .fipa-msg-row.cfp { border-left-color: var(--p2p-cyan); background: rgba(0, 229, 255, 0.04); }
+        .fipa-msg-row.propose { border-left-color: var(--solar-gold); background: rgba(245, 158, 11, 0.04); }
+        .fipa-msg-row.accept { border-left-color: var(--battery-green); background: rgba(16, 185, 129, 0.04); }
+        .fipa-msg-row.settle { border-left-color: #38BDF8; background: rgba(56, 189, 248, 0.04); }
+        .fipa-msg-row.outage { border-left-color: var(--grid-red); background: rgba(239, 68, 68, 0.08); }
+
+        .fipa-timestamp {
+            font-size: 0.7rem;
+            color: var(--neutral-dim);
+            margin-right: 6px;
+        }
+
+        .fipa-actor {
+            font-weight: 700;
+            color: #FFFFFF;
+        }
+
+        .fipa-verb {
+            font-weight: 800;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+        }
+
+        .fipa-verb.cfp { color: var(--p2p-cyan); }
+        .fipa-verb.propose { color: var(--solar-gold); }
+        .fipa-verb.accept { color: var(--battery-green); }
+        .fipa-verb.settle { color: #38BDF8; }
+
+        /* Secondary Grid: 24h Canvas Chart + Algorithm Comparison */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: 1.8fr 1.2fr;
+            gap: 22px;
+        }
+
+        /* 24h Canvas Chart */
+        .chart-stage {
+            width: 100%;
+            height: 320px;
+            position: relative;
+        }
+
+        canvas#dispatchChart {
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-legend-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 14px;
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: var(--neutral-slate);
+        }
+
+        .legend-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .legend-chip-color {
+            width: 12px;
+            height: 4px;
+            border-radius: 2px;
+        }
+
+        /* Algorithm Benchmark Comparison Card */
+        .algorithm-compare-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .algorithm-box {
+            padding: 16px 18px;
+            border-radius: var(--r-md);
+            background: rgba(16, 24, 44, 0.6);
+            border: 1px solid var(--border-default);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .algorithm-box.astar-optimal {
+            border-color: rgba(16, 185, 129, 0.4);
+            background: rgba(16, 185, 129, 0.04);
+            box-shadow: var(--shadow-glow-green);
+        }
+
+        .algorithm-box-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-family: var(--font-display);
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .stat-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.82rem;
+            font-family: var(--font-mono);
+        }
+
+        .stat-line span.key { color: var(--neutral-dim); }
+        .stat-line span.val { font-weight: 700; color: var(--neutral-white); }
+
+        .savings-hero-badge {
+            margin-top: 8px;
+            padding: 10px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            border-radius: var(--r-sm);
+            text-align: center;
+        }
+
+        .savings-hero-badge .percent {
+            font-family: var(--font-mono);
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--battery-green);
+        }
+
+        /* Discrete Steps Log Table */
+        .log-table-wrap {
+            overflow-x: auto;
+            max-height: 340px;
+            overflow-y: auto;
+            border-radius: var(--r-md);
+            border: 1px solid var(--border-default);
+        }
+
+        .log-table-wrap::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+
+        .log-table-wrap::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+        }
+
+        table.telemetry-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            text-align: right;
+            font-family: var(--font-mono);
+        }
+
+        table.telemetry-table th, table.telemetry-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        table.telemetry-table th {
+            position: sticky;
+            top: 0;
+            background: #0D1322;
+            font-weight: 700;
+            color: var(--neutral-dim);
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            z-index: 10;
+        }
+
+        table.telemetry-table td:first-child, table.telemetry-table th:first-child { text-align: left; }
+
+        table.telemetry-table tbody tr.active-timestep {
+            background: rgba(0, 229, 255, 0.1) !important;
+            border-left: 3px solid var(--p2p-cyan);
+        }
+
+        table.telemetry-table tbody tr:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        /* Floating Operations Dock (Bottom Controller) */
+        .scada-dock {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(11, 16, 28, 0.94);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border-default);
+            padding: 14px 36px;
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            z-index: 100;
+            box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.7);
+        }
+
+        .dock-playback-btns {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dock-btn-sec {
+            width: 38px;
+            height: 38px;
+            border-radius: var(--r-sm);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-default);
+            color: var(--neutral-white);
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .dock-btn-sec:hover {
+            border-color: var(--p2p-cyan);
+            color: var(--p2p-cyan);
+            background: rgba(0, 229, 255, 0.08);
+        }
+
+        .dock-btn-sec:active {
+            transform: scale(0.95);
+        }
+
+        .dock-play-btn {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--p2p-cyan), #0284C7);
+            color: #050B14;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.25rem;
+            font-weight: 800;
+            box-shadow: var(--shadow-glow-cyan);
+            transition: transform 0.15s ease;
+        }
+
+        .dock-play-btn:hover { transform: scale(1.06); }
+        .dock-play-btn:active { transform: scale(0.96); }
+
+        /* Dynamic Multi-Agent Fleet Styles */
+        .agent-fleet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        .agent-node-card {
+            background: rgba(14, 20, 36, 0.75);
+            border: 1px solid var(--border-default);
+            border-radius: var(--r-md);
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .agent-node-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .agent-node-card.surplus { border-left: 3px solid var(--battery-green); }
+        .agent-node-card.deficit { border-left: 3px solid var(--grid-red); }
+        .agent-node-card.balanced { border-left: 3px solid var(--p2p-cyan); }
+
+        .agent-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .agent-card-title {
+            font-family: var(--font-display);
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--neutral-white);
+        }
+
+        .agent-badge-pill {
+            font-size: 0.68rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            padding: 2px 7px;
+            border-radius: var(--r-pill);
+            text-transform: uppercase;
+        }
+
+        .agent-badge-pill.surplus { background: rgba(16, 185, 129, 0.15); color: var(--battery-green); border: 1px solid rgba(16, 185, 129, 0.3); }
+        .agent-badge-pill.deficit { background: rgba(239, 68, 68, 0.15); color: var(--grid-red); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .agent-badge-pill.balanced { background: rgba(0, 229, 255, 0.15); color: var(--p2p-cyan); border: 1px solid rgba(0, 229, 255, 0.3); }
+
+        .agent-soc-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .agent-soc-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.72rem;
+            font-family: var(--font-mono);
+            color: var(--neutral-slate);
+        }
+
+        .agent-soc-bar-bg {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+        }
+
+        .agent-soc-bar-fill {
+            height: 100%;
+            background: var(--battery-green);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .agent-metrics-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+        }
+
+        .agent-metric-item {
+            color: var(--neutral-dim);
+        }
+
+        .agent-metric-item span {
+            color: var(--neutral-white);
+            font-weight: 600;
+        }
+
+        .dock-slider-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .dock-slider-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--neutral-dim);
+            font-weight: 600;
+        }
+
+        input[type=range].scada-slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.12);
+            outline: none;
+            cursor: pointer;
+            accent-color: var(--p2p-cyan);
+        }
+
+        .dock-time-display {
+            font-family: var(--font-mono);
+            font-weight: 800;
+            font-size: 1.35rem;
+            color: #FFFFFF;
+            min-width: 75px;
+            text-align: center;
+        }
+
+        .dock-tariff-badge {
+            padding: 5px 14px;
+            border-radius: var(--r-pill);
+            font-size: 0.75rem;
+            font-weight: 800;
+            font-family: var(--font-mono);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        select.dock-speed-select {
+            padding: 6px 12px;
+            border-radius: var(--r-sm);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-default);
+            color: var(--neutral-white);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* SVG Mimic Animations & Styles */
+        .breaker-closed { fill: var(--battery-green); filter: drop-shadow(0 0 6px var(--battery-green)); }
+        .breaker-tripped { fill: var(--grid-red); filter: drop-shadow(0 0 10px var(--grid-red)); animation: pulse-ring 1s infinite; }
+        
+        .power-flow-anim {
+            stroke-dasharray: 8, 8;
+            animation: flow-dash 1.2s linear infinite;
+        }
+        @keyframes flow-dash {
+            from { stroke-dashoffset: 32; }
+            to { stroke-dashoffset: 0; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #data-error-notice {
+            display: none;
+            background: var(--grid-red);
+            color: #FFFFFF;
+            padding: 12px;
+            text-align: center;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="data-error-notice">Simulation Telemetry Missing — Execute: python export_dashboard_data.py; python generate_dashboard_js.py</div>
+
+    <!-- Top SCADA Operations Bar -->
+    <header class="scada-header">
+        <div class="header-brand">
+            <div class="brand-badge-icon">⚡</div>
+            <div class="brand-titles">
+                <h1>Smart Grid Microgrid SCADA <span class="pulse-status-badge"><span class="pulse-dot"></span>Multi-Agent Active</span></h1>
+                <p>Decentralized Contract-Net Coordination // A* Predictive Energy Arbitrage</p>
+            </div>
+        </div>
+
+        <div class="header-controls">
+            <!-- Scenario Selector -->
+            <div class="scenario-select-wrap">
+                <select class="scada-dropdown" id="scenario-dropdown">
+                    <option value="real_world_dataset">Empirical Smart Meter Dataset (NREL / Ausgrid)</option>
+                    <option value="baseline">Standard Baseline Day (Analytical Formula)</option>
+                    <option value="cloud_cover">Shock 1: Sudden Cloud Cover (0.4× PV / 60% Reduction)</option>
+                    <option value="peak_demand">Shock 2: Residential Peak Demand Surge (1.5× Load / +50% Surge)</option>
+                    <option value="grid_outage">Shock 3: Macro-Grid Blackout (Microgrid Islanding)</option>
+                    <option value="combined">Combined Stress Test (Multi-Shock Failure)</option>
+                </select>
+            </div>
+
+            <!-- Segmented Mode Controller -->
+            <div class="segmented-mode-switch">
+                <button class="mode-btn active" id="mode-greedy" title="Myopic Reactive Dispatch (No Lookahead)">Greedy Baseline</button>
+                <button class="mode-btn" id="mode-astar" title="A* Local Optimization over H=12 Lookahead Horizon">A* Predictive</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="scada-container">
+
+        <!-- Active Environmental Shock Alert Banner -->
+        <div class="shock-callout-banner" id="shock-callout">
+            <div class="shock-left">
+                <div class="shock-icon-alert">⚠️</div>
+                <div>
+                    <div class="shock-desc-title" id="shock-banner-title">ENVIRONMENTAL SHOCK TRIGGERED</div>
+                    <div class="shock-desc-body" id="shock-banner-body">Autonomous multi-agent negotiation compensating for external perturbation.</div>
+                </div>
+            </div>
+            <div class="pulse-status-badge" style="background:rgba(239,68,68,0.2); border-color:var(--grid-red); color:#FCA5A5;">GRID ISLANDED</div>
+        </div>
+
+        <!-- Shock Quick-Trigger Bar (Direct Rubric 3M Demo Requirement) -->
+        <div class="shock-inject-row">
+            <span class="label">Interactive Shock Test:</span>
+            <button class="shock-trigger-btn" onclick="switchScenario('real_world_dataset')">Empirical Dataset</button>
+            <button class="shock-trigger-btn" onclick="switchScenario('cloud_cover')">Cloud Cover (0.4× PV)</button>
+            <button class="shock-trigger-btn" onclick="switchScenario('peak_demand')">Peak Surge (1.5× Load)</button>
+            <button class="shock-trigger-btn" onclick="switchScenario('grid_outage')">Macro Blackout (Islanding)</button>
+            <button class="shock-trigger-btn" onclick="switchScenario('combined')">Combined Stress</button>
+        </div>
+
+        <!-- 4 Key Operations Gauges -->
+        <div class="kpi-row">
+            <div class="kpi-stat-box cost">
+                <div class="kpi-header">
+                    <span>24h Electricity Cost</span>
+                    <span id="cost-delta-badge" style="color:var(--battery-green); font-weight:800;">-5.5% OPTIMIZED</span>
+                </div>
+                <div class="kpi-number-wrap">
+                    <span class="kpi-number" id="kpi-cost-val">0.00</span>
+                    <span class="kpi-unit">Rs.</span>
+                </div>
+                <div class="kpi-subtext">
+                    <span>Time-of-Use Net Bill</span>
+                    <span id="cost-sub-detail">A* Savings active</span>
+                </div>
+            </div>
+
+            <div class="kpi-stat-box import">
+                <div class="kpi-header">
+                    <span>Macro-Grid Inflow</span>
+                    <span style="color:var(--grid-rose); font-weight:800;" id="kpi-import-status">INTERTIE ACTIVE</span>
+                </div>
+                <div class="kpi-number-wrap">
+                    <span class="kpi-number" id="kpi-import-val">0.0</span>
+                    <span class="kpi-unit">kWh</span>
+                </div>
+                <div class="kpi-subtext">
+                    <span>Utility Substation Import</span>
+                    <span>11kV / 230V</span>
+                </div>
+            </div>
+
+            <div class="kpi-stat-box p2p">
+                <div class="kpi-header">
+                    <span>Decentralized P2P Traded</span>
+                    <span style="color:var(--p2p-cyan); font-weight:800;">CONTRACT-NET</span>
+                </div>
+                <div class="kpi-number-wrap">
+                    <span class="kpi-number" id="kpi-p2p-val">0.0</span>
+                    <span class="kpi-unit">kWh</span>
+                </div>
+                <div class="kpi-subtext">
+                    <span>Neighborhood Bilateral Clearings</span>
+                    <span>Peer Mesh</span>
+                </div>
+            </div>
+
+            <div class="kpi-stat-box unmet">
+                <div class="kpi-header">
+                    <span>Microgrid Reliability</span>
+                    <span style="color:var(--battery-green); font-weight:800;" id="kpi-reliability-badge">100% SERVED</span>
+                </div>
+                <div class="kpi-number-wrap">
+                    <span class="kpi-number" id="kpi-unmet-val">0.0</span>
+                    <span class="kpi-unit">kWh Unmet</span>
+                </div>
+                <div class="kpi-subtext">
+                    <span>Deficit Resilience</span>
+                    <span>Zero Load Shedding</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Centerpiece: Cyber-Physical Microgrid Schematic + FIPA Message Console -->
+        <div class="scada-main-grid">
+            
+            <!-- Electrical Mimic Schematic (SVG) -->
+            <div class="scada-card" style="padding: 18px 20px;">
+                <div class="card-topbar">
+                    <div class="card-topbar-title">
+                        <span>⚡ Cyber-Physical Microgrid Electrical Mimic Panel</span>
+                    </div>
+                    <div class="pulse-status-badge" id="mimic-grid-badge">GRID-TIED (230V AC)</div>
+                </div>
+
+                <div class="mimic-schematic-wrap" id="schematic-canvas">
+                    <!-- High-Fidelity SVG Mimic Board rendered by JS -->
+                </div>
+            </div>
+
+            <!-- FIPA Contract-Net Protocol Message Drawer -->
+            <div class="scada-card" style="padding: 18px 20px;">
+                <div class="card-topbar">
+                    <div class="card-topbar-title">
+                        <span>💬 FIPA ACL Protocol Message Stream</span>
+                    </div>
+                    <span style="font-size:0.75rem; color:var(--neutral-dim); font-family:var(--font-mono);">DECISION TIER 3</span>
+                </div>
+
+                <div class="fipa-console-wrap">
+                    <div class="fipa-header-bar">
+                        <div class="fipa-title">
+                            <span>AGENT_COMM_LOG://FIPA_CNP</span>
+                        </div>
+                        <div class="fipa-terminal-dots">
+                            <span class="dot-term red"></span>
+                            <span class="dot-term yellow"></span>
+                            <span class="dot-term green"></span>
+                        </div>
+                    </div>
+                    <div class="fipa-feed" id="fipa-terminal-log">
+                        <!-- Populated dynamically with actual agent message exchanges -->
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Analytics Grid: 24h Diurnal Chart + Algorithm Benchmark -->
+        <div class="analytics-grid">
+            
+            <!-- 24-Hour Diurnal Dispatch Canvas Chart -->
+            <div class="scada-card">
+                <div class="card-topbar">
+                    <div class="card-topbar-title">
+                        <span>📈 24-Hour Diurnal Dispatch, Storage & TOU Tariffs</span>
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--neutral-dim); font-family:var(--font-mono);">Click & scrub hour on chart</div>
+                </div>
+                
+                <div class="chart-stage">
+                    <canvas id="dispatchChart"></canvas>
+                </div>
+
+                <div class="chart-legend-row">
+                    <div class="legend-chip"><div class="legend-chip-color" style="background:var(--solar-gold)"></div>Solar PV Generation</div>
+                    <div class="legend-chip"><div class="legend-chip-color" style="background:#FFFFFF"></div>Aggregate Demand</div>
+                    <div class="legend-chip"><div class="legend-chip-color" style="background:var(--grid-red)"></div>Macro-Grid Import</div>
+                    <div class="legend-chip"><div class="legend-chip-color" style="background:var(--battery-green); border:1px dashed var(--battery-green);"></div>Avg Battery SOC (%)</div>
+                    <div class="legend-chip"><div class="legend-chip-color" style="background:rgba(239, 68, 68, 0.3)"></div>Peak Tariff Band (Rs.8/kWh)</div>
+                </div>
+            </div>
+
+            <!-- Algorithm Head-to-Head Comparison -->
+            <div class="scada-card">
+                <div class="card-topbar">
+                    <div class="card-topbar-title">
+                        <span>⚖️ Algorithm Optimization Scorecard</span>
+                    </div>
+                    <span style="font-size:0.75rem; color:var(--neutral-dim); font-family:var(--font-mono);">24-HOUR BENCHMARK</span>
+                </div>
+
+                <div class="algorithm-compare-wrap">
+                    <!-- Greedy -->
+                    <div class="algorithm-box" id="algo-box-greedy">
+                        <div class="algorithm-box-title">
+                            <span>Greedy Baseline (Myopic)</span>
+                            <span class="pulse-status-badge" style="background:rgba(245,158,11,0.15); color:var(--solar-gold); border-color:var(--solar-gold);">REACTIVE</span>
+                        </div>
+                        <div class="stat-line"><span class="key">24h Energy Bill</span><span class="val" id="score-g-cost">Rs. -</span></div>
+                        <div class="stat-line"><span class="key">Macro-Grid Import</span><span class="val" id="score-g-import">- kWh</span></div>
+                        <div class="stat-line"><span class="key">Peak Import (17-21h)</span><span class="val" id="score-g-peak-import">- kWh</span></div>
+                        <div class="stat-line"><span class="key">Decentralized P2P</span><span class="val" id="score-g-p2p">- kWh</span></div>
+                        <div class="stat-line"><span class="key">Grid Export</span><span class="val" id="score-g-export">- kWh</span></div>
+                        <div class="stat-line"><span class="key">Unmet Demand</span><span class="val" id="score-g-unmet">- kWh</span></div>
+                        <div class="stat-line"><span class="key">Avg Battery SOC</span><span class="val" id="score-g-soc">-%</span></div>
+                        <div class="stat-line"><span class="key">Decision Horizon</span><span class="val" style="color:var(--neutral-dim)">Instantaneous (H = 1 Step)</span></div>
+                    </div>
+
+                    <!-- A* Planning -->
+                    <div class="algorithm-box astar-optimal" id="algo-box-astar">
+                        <div class="algorithm-box-title">
+                            <span style="color:var(--battery-green);">A* Informed Planning (H=12 Lookahead) ✓</span>
+                            <span class="pulse-status-badge" style="background:rgba(16,185,129,0.2); color:var(--battery-green); border-color:var(--battery-green);" title="Optimal with respect to discrete action set, local cost function, and H=12 lookahead horizon">LOCAL OPTIMAL (H=12)</span>
+                        </div>
+                        <div class="stat-line"><span class="key">24h Energy Bill</span><span class="val" style="color:var(--battery-green);" id="score-a-cost">Rs. -</span></div>
+                        <div class="stat-line"><span class="key">Macro-Grid Import</span><span class="val" id="score-a-import">- kWh</span></div>
+                        <div class="stat-line"><span class="key">Peak Import (17-21h)</span><span class="val" id="score-a-peak-import">- kWh</span></div>
+                        <div class="stat-line"><span class="key">Decentralized P2P</span><span class="val" id="score-a-p2p">- kWh</span></div>
+                        <div class="stat-line"><span class="key">Grid Export</span><span class="val" id="score-a-export">- kWh</span></div>
+                        <div class="stat-line"><span class="key">Unmet Demand</span><span class="val" id="score-a-unmet">- kWh</span></div>
+                        <div class="stat-line"><span class="key">Avg Battery SOC</span><span class="val" id="score-a-soc">-%</span></div>
+                        <div class="stat-line"><span class="key">Decision Horizon</span><span class="val" style="color:var(--p2p-cyan)">Lookahead Horizon (H = 12 Hours)</span></div>
+                        
+                        <div class="savings-hero-badge">
+                            <div style="font-size:0.75rem; color:var(--neutral-slate); font-weight:700; text-transform:uppercase;">Economic Arbitrage Benefit</div>
+                            <div class="percent" id="score-savings-pct">0.0% SAVINGS</div>
+                            <div style="font-size:0.75rem; color:var(--neutral-dim); margin-top:2px;" id="score-cost-diff">Rs. 0.00 saved</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Decentralized Multi-Agent Fleet Status Panel (Supports 3, 10, 25, 50 Households) -->
+        <div class="scada-card">
+            <div class="card-topbar">
+                <div class="card-topbar-title">
+                    <span>🏘️ Autonomous Household Agent Fleet (<span id="agent-count-badge">3 Prosumers</span>)</span>
+                </div>
+                <span class="pulse-status-badge" id="fleet-coordination-badge">P2P CONTRACT-NET COORDINATION</span>
+            </div>
+            <div class="agent-fleet-grid" id="agent-fleet-container">
+                <!-- Rendered dynamically for any N households -->
+            </div>
+        </div>
+
+        <!-- Discrete Timestep Telemetry Table -->
+        <div class="scada-card">
+            <div class="card-topbar">
+                <div class="card-topbar-title">
+                    <span>📋 Discrete Timestep Telemetry (24 Hourly Steps)</span>
+                </div>
+                <span class="pulse-status-badge">MESA STEP ENGINE</span>
+            </div>
+
+            <div class="log-table-wrap">
+                <table class="telemetry-table" id="scada-telemetry-table">
+                    <thead>
+                        <tr>
+                            <th>Timestep</th>
+                            <th>Solar Gen (kW)</th>
+                            <th>Demand (kW)</th>
+                            <th>P2P Traded (kWh)</th>
+                            <th>Grid Import (kWh)</th>
+                            <th>Grid Export (kWh)</th>
+                            <th>Unmet Load (kWh)</th>
+                            <th>Avg Battery SOC</th>
+                            <th>TOU Tariff</th>
+                            <th>Operating State</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Rendered by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Floating Operations Dock (Bottom Controller) -->
+    <footer class="scada-dock">
+        <div class="dock-playback-btns">
+            <button class="dock-btn-sec" id="btn-reset" title="Reset Simulation to 00:00">⏮</button>
+            <button class="dock-btn-sec" id="btn-prev" title="Step Back 1 Hour">◀</button>
+            <button class="dock-play-btn" id="play-pause-btn" title="Toggle 24-Hour Simulation Playback">▶</button>
+            <button class="dock-btn-sec" id="btn-next" title="Step Forward 1 Hour">▶</button>
+        </div>
+
+        <div class="dock-slider-area">
+            <span class="dock-slider-label">00:00</span>
+            <input type="range" class="scada-slider" id="hour-time-slider" min="0" max="23" value="0">
+            <span class="dock-slider-label">23:00</span>
+        </div>
+
+        <div class="dock-time-display" id="clock-display">00:00</div>
+
+        <div class="dock-tariff-badge" id="tariff-tier-badge" style="background:rgba(0,229,255,0.15); color:var(--p2p-cyan); border:1px solid rgba(0,229,255,0.3);">
+            OFF-PEAK Rs. 3/kWh
+        </div>
+
+        <select class="dock-speed-select" id="sim-speed-select">
+            <option value="1200">1.0x Realtime</option>
+            <option value="600">2.0x Fast</option>
+            <option value="300">4.0x Turbo</option>
+        </select>
+    </footer>
+
+    <!-- Simulation Data Payload -->
+    <script src="dashboard_data.js"></script>
+    <script>
+        // State Machine
+        let activeScenario = 'real_world_dataset';
+        let activeMode = 'greedy';
+        let activeHour = 0;
+        let isSimPlaying = false;
+        let simPlaybackTimer = null;
+        let simSpeedMs = 1200;
+
+        // DOM Handles
+        const scenarioDropdown = document.getElementById('scenario-dropdown');
+        const btnModeGreedy = document.getElementById('mode-greedy');
+        const btnModeAstar = document.getElementById('mode-astar');
+        const btnPlayPause = document.getElementById('play-pause-btn');
+        const timeSlider = document.getElementById('hour-time-slider');
+        const clockDisplay = document.getElementById('clock-display');
+        const tariffBadge = document.getElementById('tariff-tier-badge');
+        const simSpeedSelect = document.getElementById('sim-speed-select');
+        const shockCallout = document.getElementById('shock-callout');
+        const shockTitle = document.getElementById('shock-banner-title');
+        const shockBody = document.getElementById('shock-banner-body');
+
+        function initApp() {
+            // Check data presence
+            if (!window.GRID_DATA || Object.keys(window.GRID_DATA).length === 0) {
+                document.getElementById('data-error-notice').style.display = 'block';
+                return;
+            }
+
+            // Set initial scenario in dropdown
+            scenarioDropdown.value = activeScenario;
+
+            setupEventListeners();
+            renderMimicSchematic();
+            refreshDashboardView();
+        }
+
+        function setupEventListeners() {
+            scenarioDropdown.addEventListener('change', (e) => {
+                switchScenario(e.target.value);
+            });
+
+            btnModeGreedy.addEventListener('click', () => {
+                activeMode = 'greedy';
+                btnModeGreedy.classList.add('active');
+                btnModeAstar.classList.remove('active');
+                refreshDashboardView();
+            });
+
+            btnModeAstar.addEventListener('click', () => {
+                activeMode = 'astar';
+                btnModeAstar.classList.add('active');
+                btnModeGreedy.classList.remove('active');
+                refreshDashboardView();
+            });
+
+            timeSlider.addEventListener('input', (e) => {
+                activeHour = parseInt(e.target.value);
+                updateCurrentTimestepView();
+            });
+
+            btnPlayPause.addEventListener('click', togglePlayback);
+
+            const btnReset = document.getElementById('btn-reset');
+            const btnPrev = document.getElementById('btn-prev');
+            const btnNext = document.getElementById('btn-next');
+
+            if (btnReset) {
+                btnReset.addEventListener('click', () => {
+                    if (isSimPlaying) togglePlayback();
+                    activeHour = 0;
+                    timeSlider.value = 0;
+                    updateCurrentTimestepView();
+                });
+            }
+
+            if (btnPrev) {
+                btnPrev.addEventListener('click', () => {
+                    if (activeHour > 0) {
+                        activeHour--;
+                        timeSlider.value = activeHour;
+                        updateCurrentTimestepView();
+                    }
+                });
+            }
+
+            if (btnNext) {
+                btnNext.addEventListener('click', () => {
+                    if (activeHour < 23) {
+                        activeHour++;
+                        timeSlider.value = activeHour;
+                        updateCurrentTimestepView();
+                    }
+                });
+            }
+
+            simSpeedSelect.addEventListener('change', (e) => {
+                simSpeedMs = parseInt(e.target.value);
+                if (isSimPlaying) {
+                    togglePlayback();
+                    togglePlayback();
+                }
+            });
+
+            window.addEventListener('resize', () => {
+                if (window.GRID_DATA && window.GRID_DATA[activeScenario]) {
+                    renderDispatchChart(window.GRID_DATA[activeScenario][activeMode].hourly);
+                }
+            });
+        }
+
+        function switchScenario(scenName) {
+            activeScenario = scenName;
+            scenarioDropdown.value = scenName;
+            refreshDashboardView();
+        }
+
+        function togglePlayback() {
+            if (isSimPlaying) {
+                isSimPlaying = false;
+                btnPlayPause.textContent = '▶';
+                clearInterval(simPlaybackTimer);
+            } else {
+                isSimPlaying = true;
+                btnPlayPause.textContent = '⏸';
+                if (activeHour >= 23) {
+                    activeHour = 0;
+                    timeSlider.value = 0;
+                }
+                simPlaybackTimer = setInterval(() => {
+                    activeHour++;
+                    if (activeHour > 23) {
+                        activeHour = 23;
+                        togglePlayback();
+                    } else {
+                        timeSlider.value = activeHour;
+                        updateCurrentTimestepView();
+                    }
+                }, simSpeedMs);
+            }
+        }
+
+        function refreshDashboardView() {
+            if (!window.GRID_DATA || !window.GRID_DATA[activeScenario]) return;
+            const scenarioBundle = window.GRID_DATA[activeScenario];
+            const currentModeData = scenarioBundle[activeMode];
+
+            // 1. Update 4 Industrial KPI Cards
+            document.getElementById('kpi-cost-val').textContent = currentModeData.metrics.cost.toFixed(2);
+            document.getElementById('kpi-import-val').textContent = currentModeData.metrics.gridImport.toFixed(1);
+            document.getElementById('kpi-p2p-val').textContent = currentModeData.metrics.p2pTraded.toFixed(1);
+            
+            const unmetEl = document.getElementById('kpi-unmet-val');
+            const reliabilityBadge = document.getElementById('kpi-reliability-badge');
+            unmetEl.textContent = currentModeData.metrics.unmet.toFixed(1);
+            if (currentModeData.metrics.unmet > 0) {
+                unmetEl.style.color = 'var(--grid-red)';
+                reliabilityBadge.textContent = 'OUTAGE DEFICIT';
+                reliabilityBadge.style.color = 'var(--grid-red)';
+            } else {
+                unmetEl.style.color = 'var(--neutral-white)';
+                reliabilityBadge.textContent = '100% SERVED';
+                reliabilityBadge.style.color = 'var(--battery-green)';
+            }
+
+            // Savings Badge
+            const aData = scenarioBundle['astar'].metrics;
+            const costBadge = document.getElementById('cost-delta-badge');
+            if (aData.savings > 0) {
+                costBadge.textContent = `-${aData.savings}% A* OPTIMIZATION`;
+                costBadge.style.display = 'inline';
+            } else {
+                costBadge.textContent = 'BASELINE';
+            }
+
+            // 2. Algorithm Comparison Cards
+            const gData = scenarioBundle['greedy'].metrics;
+            document.getElementById('score-g-cost').textContent = 'Rs. ' + gData.cost.toFixed(2);
+            document.getElementById('score-g-import').textContent = gData.gridImport.toFixed(1) + ' kWh';
+            document.getElementById('score-g-peak-import').textContent = (gData.peakImport || 0).toFixed(1) + ' kWh';
+            document.getElementById('score-g-p2p').textContent = gData.p2pTraded.toFixed(1) + ' kWh';
+            document.getElementById('score-g-export').textContent = (gData.gridExport || 0).toFixed(1) + ' kWh';
+            document.getElementById('score-g-unmet').textContent = gData.unmet.toFixed(1) + ' kWh';
+            document.getElementById('score-g-soc').textContent = (gData.avgSoc || 0).toFixed(1) + '%';
+
+            document.getElementById('score-a-cost').textContent = 'Rs. ' + aData.cost.toFixed(2);
+            document.getElementById('score-a-import').textContent = aData.gridImport.toFixed(1) + ' kWh';
+            document.getElementById('score-a-peak-import').textContent = (aData.peakImport || 0).toFixed(1) + ' kWh';
+            document.getElementById('score-a-p2p').textContent = aData.p2pTraded.toFixed(1) + ' kWh';
+            document.getElementById('score-a-export').textContent = (aData.gridExport || 0).toFixed(1) + ' kWh';
+            document.getElementById('score-a-unmet').textContent = aData.unmet.toFixed(1) + ' kWh';
+            document.getElementById('score-a-soc').textContent = (aData.avgSoc || 0).toFixed(1) + '%';
+
+            const costDiff = gData.cost - aData.cost;
+            if (costDiff > 0.01) {
+                document.getElementById('score-savings-pct').textContent = `${aData.savings}% COST REDUCTION`;
+                document.getElementById('score-cost-diff').textContent = `Rs. ${costDiff.toFixed(2)} economic arbitrage saved`;
+            } else if (costDiff < -0.01) {
+                document.getElementById('score-savings-pct').textContent = `PARITY / TRADE-OFF`;
+                document.getElementById('score-cost-diff').textContent = `Reliability / Storage prioritizing`;
+            } else {
+                document.getElementById('score-savings-pct').textContent = `ECONOMIC PARITY`;
+                document.getElementById('score-cost-diff').textContent = `Zero cost difference`;
+            }
+
+            // 3. Render Table, Chart & Timestep
+            populateTable(currentModeData.hourly);
+            renderDispatchChart(currentModeData.hourly);
+            updateCurrentTimestepView();
+        }
+
+        function updateCurrentTimestepView() {
+            if (!window.GRID_DATA || !window.GRID_DATA[activeScenario]) return;
+            const hourlyArr = window.GRID_DATA[activeScenario][activeMode].hourly;
+            if (!hourlyArr || !hourlyArr[activeHour]) return;
+
+            const cur = hourlyArr[activeHour];
+
+            // Update Clock & Tariff Badge
+            clockDisplay.textContent = `${activeHour.toString().padStart(2, '0')}:00`;
+
+            if (cur.touRate >= 8) {
+                tariffBadge.textContent = 'PEAK TARIFF: Rs. 8/kWh';
+                tariffBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+                tariffBadge.style.color = '#F87171';
+                tariffBadge.style.border = '1px solid rgba(239, 68, 68, 0.5)';
+            } else if (cur.touRate >= 5) {
+                tariffBadge.textContent = 'NORMAL TARIFF: Rs. 5/kWh';
+                tariffBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+                tariffBadge.style.color = '#FBBF24';
+                tariffBadge.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+            } else {
+                tariffBadge.textContent = 'OFF-PEAK TARIFF: Rs. 3/kWh';
+                tariffBadge.style.background = 'rgba(0, 229, 255, 0.15)';
+                tariffBadge.style.color = 'var(--p2p-cyan)';
+                tariffBadge.style.border = '1px solid rgba(0, 229, 255, 0.4)';
+            }
+
+            // Shock Banner State
+            if (cur.shock !== 'none') {
+                shockCallout.classList.add('active');
+                if (cur.shock === 'cloud') {
+                    shockTitle.textContent = 'ENVIRONMENTAL SHOCK: SUDDEN CLOUD COVER (0.4× PV / 60% REDUCTION)';
+                    shockBody.textContent = 'Solar irradiance dropped to 40% of baseline. BESS discharging autonomously to bridge residential load.';
+                } else if (cur.shock === 'peak') {
+                    shockTitle.textContent = 'ENVIRONMENTAL SHOCK: RESIDENTIAL PEAK DEMAND SURGE (1.5× LOAD / +50%)';
+                    shockBody.textContent = 'Coincident appliance surge (1.5× multiplier). P2P energy sharing preventing expensive macro-grid peak import.';
+                } else if (cur.shock === 'outage') {
+                    shockTitle.textContent = 'CRITICAL SHOCK: MACRO-GRID BLACKOUT // ISLANDING INITIATED';
+                    shockBody.textContent = 'Substation circuit breaker tripped. Microgrid is operating in 100% self-sufficient islanded mode.';
+                }
+            } else {
+                shockCallout.classList.remove('active');
+            }
+
+            // Active Table Row Highlight
+            document.querySelectorAll('#scada-telemetry-table tbody tr').forEach((tr, idx) => {
+                if (idx === activeHour) {
+                    tr.classList.add('active-timestep');
+                    // Keep the active row visible by scrolling ONLY the table's own box.
+                    // (scrollIntoView would also scroll the whole page down to the table.)
+                    if (isSimPlaying) {
+                        const box = tr.closest('.log-table-wrap');
+                        if (box) {
+                            const header = box.querySelector('thead');
+                            const headerH = header ? header.offsetHeight : 0;
+                            const rowTop = tr.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+                            const rowBottom = rowTop + tr.offsetHeight;
+                            if (rowTop - headerH < box.scrollTop) {
+                                box.scrollTo({ top: rowTop - headerH, behavior: 'smooth' });
+                            } else if (rowBottom > box.scrollTop + box.clientHeight) {
+                                box.scrollTo({ top: rowBottom - box.clientHeight, behavior: 'smooth' });
+                            }
+                        }
+                    }
+                } else {
+                    tr.classList.remove('active-timestep');
+                }
+            });
+
+            // Update Mimic Schematic, FIPA Terminal, Fleet Grid, and Chart Scrub Line
+            updateMimicState(cur);
+            renderAgentFleet(cur.nodes);
+            updateFipaConsole(cur);
+            renderDispatchChart(hourlyArr);
+        }
+
+        function populateTable(hourlyRecords) {
+            const tbody = document.querySelector('#scada-telemetry-table tbody');
+            tbody.innerHTML = '';
+
+            hourlyRecords.forEach(row => {
+                const tr = document.createElement('tr');
+                const isPeak = row.touRate >= 8;
+
+                tr.innerHTML = `
+                    <td style="font-weight:700; color:#FFFFFF;">${row.hour.toString().padStart(2, '0')}:00</td>
+                    <td style="color:var(--solar-gold);">${row.solar.toFixed(2)}</td>
+                    <td style="color:#FFFFFF;">${row.demand.toFixed(2)}</td>
+                    <td style="color:var(--p2p-cyan); font-weight:700;">${row.p2p.toFixed(2)}</td>
+                    <td style="color:${row.gridImport > 0 ? 'var(--grid-rose)' : 'var(--neutral-dim)'};">${row.gridImport.toFixed(2)}</td>
+                    <td style="color:var(--battery-green);">${row.gridExport.toFixed(2)}</td>
+                    <td style="color:${row.unmet > 0 ? 'var(--grid-red)' : 'var(--neutral-dim)'}; font-weight:${row.unmet > 0 ? '800' : 'normal'}">${row.unmet.toFixed(2)}</td>
+                    <td>${row.avgSoc.toFixed(1)}%</td>
+                    <td style="${isPeak ? 'color:var(--solar-gold); font-weight:700;' : ''}">Rs. ${row.touRate.toFixed(1)}</td>
+                    <td>${row.shock !== 'none' ? `<span style="padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:700; background:rgba(239,68,68,0.2); color:#F87171;">${row.shock.toUpperCase()}</span>` : '<span style="color:var(--neutral-dim)">NORMAL</span>'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- Render Cyber-Physical Electrical Mimic Board ---
+        function renderMimicSchematic() {
+            const container = document.getElementById('schematic-canvas');
+            container.innerHTML = `
+                <svg width="100%" height="100%" viewBox="0 0 740 495" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <!-- Glow Filters -->
+                        <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="3.5" result="blur" />
+                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                        <filter id="glow-amber" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="3.5" result="blur" />
+                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+
+                        <marker id="arrow-p2p" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                            <path d="M 0 1 L 10 5 L 0 9 z" fill="#00E5FF" />
+                        </marker>
+                    </defs>
+
+                    <!-- Background Coordinate Grid -->
+                    <line x1="40" y1="230" x2="700" y2="230" stroke="rgba(255,255,255,0.03)" stroke-width="1" />
+                    
+                    <!-- ================= 1. MACRO-GRID SUBSTATION ================= -->
+                    <g transform="translate(370, 50)">
+                        <!-- Substation Frame -->
+                        <rect x="-140" y="-30" width="280" height="60" rx="10" fill="#0D1527" stroke="#3B82F6" stroke-width="2" id="substation-frame" />
+                        <!-- Dual Coil Transformer Symbol on Left -->
+                        <circle cx="-105" cy="0" r="14" fill="none" stroke="#38BDF8" stroke-width="2.5" />
+                        <circle cx="-85" cy="0" r="14" fill="none" stroke="#38BDF8" stroke-width="2.5" />
+                        <!-- Clean Left-Aligned Text (Zero Overlap) -->
+                        <text x="-55" y="-5" text-anchor="start" font-family="Space Grotesk" font-size="12" font-weight="800" fill="#FFFFFF">11kV / 230V SUBSTATION</text>
+                        <text x="-55" y="13" text-anchor="start" font-family="JetBrains Mono" font-size="9.5" fill="var(--neutral-slate)" id="substation-telemetry">BREAKER: CLOSED | 50.0 Hz</text>
+                        <!-- Breaker Lamp Indicator on Right -->
+                        <circle cx="115" cy="0" r="7" id="breaker-lamp" class="breaker-closed" />
+                    </g>
+
+                    <!-- Feeder Line (Substation to Microgrid Busbar) -->
+                    <line id="feeder-line" x1="370" y1="80" x2="370" y2="160" stroke="#3B82F6" stroke-width="4" stroke-linecap="round" />
+
+                    <!-- ================= 2. COMMON COUPLING MICROGRID BUSBAR (PCC) ================= -->
+                    <g transform="translate(370, 160)">
+                        <rect x="-280" y="-8" width="560" height="16" rx="4" fill="#1E293B" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" />
+                        <text x="0" y="4" text-anchor="middle" font-family="JetBrains Mono" font-size="9" font-weight="700" fill="#94A3B8" letter-spacing="2">PCC COMMON AC BUSBAR (230V / 50 Hz)</text>
+                    </g>
+
+                    <!-- Drop lines from Busbar to Houses -->
+                    <line id="dropline-ha" x1="160" y1="168" x2="160" y2="240" stroke="rgba(255,255,255,0.2)" stroke-width="3" />
+                    <line id="dropline-hb" x1="370" y1="168" x2="370" y2="240" stroke="rgba(255,255,255,0.2)" stroke-width="3" />
+                    <line id="dropline-hc" x1="580" y1="168" x2="580" y2="240" stroke="rgba(255,255,255,0.2)" stroke-width="3" />
+
+                    <!-- Direct Peer-to-Peer Interconnection Flow Wire (H1 <-> H2 <-> H3) -->
+                    <path id="p2p-mesh-path" d="M 160 380 Q 265 440 370 380 Q 475 440 580 380" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="2.5" stroke-dasharray="6,6" />
+
+                    <!-- ================= 3. HOUSEHOLD PROSUMER NODES ================= -->
+                    <!-- HOUSEHOLD A: Net Consumer / Deficit Buyer -->
+                    <g id="node-card-ha" transform="translate(160, 310)">
+                        <rect x="-85" y="-70" width="170" height="140" rx="14" fill="#0E1629" stroke="rgba(255,255,255,0.15)" stroke-width="2" id="frame-ha" />
+                        <!-- Role & ID -->
+                        <text x="0" y="-46" text-anchor="middle" font-family="Space Grotesk" font-weight="800" font-size="13" fill="#FFFFFF">HOUSEHOLD A</text>
+                        <text x="0" y="-32" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="var(--neutral-dim)">PROSUMER (BUYER)</text>
+                        
+                        <!-- Battery SOC Bar -->
+                        <rect x="-65" y="-20" width="130" height="12" rx="4" fill="#141E33" stroke="rgba(255,255,255,0.08)" />
+                        <rect id="soc-bar-ha" x="-65" y="-20" width="40" height="12" rx="4" fill="var(--battery-green)" />
+                        <text id="soc-txt-ha" x="0" y="-11" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" font-weight="700" fill="#FFFFFF">SOC 30%</text>
+
+                        <!-- Live Readings -->
+                        <text id="readout-solar-ha" x="-65" y="16" font-family="JetBrains Mono" font-size="10" fill="var(--solar-gold)">☀️ PV: 0.8 kW</text>
+                        <text id="readout-load-ha" x="-65" y="32" font-family="JetBrains Mono" font-size="10" fill="#FFFFFF">🏠 Load: 4.8 kW</text>
+                        
+                        <!-- Status Badge -->
+                        <rect id="badge-bg-ha" x="-65" y="44" width="130" height="18" rx="4" fill="rgba(239,68,68,0.15)" />
+                        <text id="badge-txt-ha" x="0" y="56" text-anchor="middle" font-family="Space Grotesk" font-size="9" font-weight="800" fill="var(--grid-red)">DEFICIT (BUYING P2P)</text>
+                    </g>
+
+                    <!-- HOUSEHOLD B: Solar Prosumer / Surplus Seller -->
+                    <g id="node-card-hb" transform="translate(370, 310)">
+                        <rect x="-85" y="-70" width="170" height="140" rx="14" fill="#0E1629" stroke="rgba(255,255,255,0.15)" stroke-width="2" id="frame-hb" />
+                        <!-- Role & ID -->
+                        <text x="0" y="-46" text-anchor="middle" font-family="Space Grotesk" font-weight="800" font-size="13" fill="#FFFFFF">HOUSEHOLD B</text>
+                        <text x="0" y="-32" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="var(--solar-gold)">HIGH SOLAR (SELLER)</text>
+                        
+                        <!-- Battery SOC Bar -->
+                        <rect x="-65" y="-20" width="130" height="12" rx="4" fill="#141E33" stroke="rgba(255,255,255,0.08)" />
+                        <rect id="soc-bar-hb" x="-65" y="-20" width="110" height="12" rx="4" fill="var(--battery-green)" />
+                        <text id="soc-txt-hb" x="0" y="-11" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" font-weight="700" fill="#FFFFFF">SOC 85%</text>
+
+                        <!-- Live Readings -->
+                        <text id="readout-solar-hb" x="-65" y="16" font-family="JetBrains Mono" font-size="10" fill="var(--solar-gold)">☀️ PV: 8.5 kW</text>
+                        <text id="readout-load-hb" x="-65" y="32" font-family="JetBrains Mono" font-size="10" fill="#FFFFFF">🏠 Load: 1.2 kW</text>
+                        
+                        <!-- Status Badge -->
+                        <rect id="badge-bg-hb" x="-65" y="44" width="130" height="18" rx="4" fill="rgba(16,185,129,0.15)" />
+                        <text id="badge-txt-hb" x="0" y="56" text-anchor="middle" font-family="Space Grotesk" font-size="9" font-weight="800" fill="var(--battery-green)">SURPLUS (OFFERING P2P)</text>
+                    </g>
+
+                    <!-- HOUSEHOLD C: Balanced Storage Peer -->
+                    <g id="node-card-hc" transform="translate(580, 310)">
+                        <rect x="-85" y="-70" width="170" height="140" rx="14" fill="#0E1629" stroke="rgba(255,255,255,0.15)" stroke-width="2" id="frame-hc" />
+                        <!-- Role & ID -->
+                        <text x="0" y="-46" text-anchor="middle" font-family="Space Grotesk" font-weight="800" font-size="13" fill="#FFFFFF">HOUSEHOLD C</text>
+                        <text x="0" y="-32" text-anchor="middle" font-family="JetBrains Mono" font-size="9" fill="var(--neutral-dim)">STORAGE BUFFER</text>
+                        
+                        <!-- Battery SOC Bar -->
+                        <rect x="-65" y="-20" width="130" height="12" rx="4" fill="#141E33" stroke="rgba(255,255,255,0.08)" />
+                        <rect id="soc-bar-hc" x="-65" y="-20" width="75" height="12" rx="4" fill="var(--battery-green)" />
+                        <text id="soc-txt-hc" x="0" y="-11" text-anchor="middle" font-family="JetBrains Mono" font-size="8.5" font-weight="700" fill="#FFFFFF">SOC 60%</text>
+
+                        <!-- Live Readings -->
+                        <text id="readout-solar-hc" x="-65" y="16" font-family="JetBrains Mono" font-size="10" fill="var(--solar-gold)">☀️ PV: 3.2 kW</text>
+                        <text id="readout-load-hc" x="-65" y="32" font-family="JetBrains Mono" font-size="10" fill="#FFFFFF">🏠 Load: 1.8 kW</text>
+                        
+                        <!-- Status Badge -->
+                        <rect id="badge-bg-hc" x="-65" y="44" width="130" height="18" rx="4" fill="rgba(0,229,255,0.15)" />
+                        <text id="badge-txt-hc" x="0" y="56" text-anchor="middle" font-family="Space Grotesk" font-size="9" font-weight="800" fill="var(--p2p-cyan)">BALANCED (LOCAL BUFFER)</text>
+                    </g>
+                </svg>
+            `;
+        }
+
+        function updateMimicState(cur) {
+            const feederLine = document.getElementById('feeder-line');
+            const breakerLamp = document.getElementById('breaker-lamp');
+            const subTelemetry = document.getElementById('substation-telemetry');
+            const mimicGridBadge = document.getElementById('mimic-grid-badge');
+            const p2pMeshPath = document.getElementById('p2p-mesh-path');
+
+            // 1. Blackout & Outage Islanding Logic
+            if (cur.shock === 'outage') {
+                feederLine.setAttribute('stroke', 'var(--grid-red)');
+                feederLine.setAttribute('stroke-dasharray', '8,8');
+                breakerLamp.className.baseVal = 'breaker-tripped';
+                subTelemetry.textContent = 'CIRCUIT BREAKER: TRIPPED // ISLANDED';
+                subTelemetry.setAttribute('fill', 'var(--grid-red)');
+                mimicGridBadge.textContent = 'ISLANDED MODE (ZERO GRID)';
+                mimicGridBadge.style.color = 'var(--grid-red)';
+                mimicGridBadge.style.borderColor = 'var(--grid-red)';
+                mimicGridBadge.style.background = 'rgba(239, 68, 68, 0.2)';
+            } else {
+                breakerLamp.className.baseVal = 'breaker-closed';
+                subTelemetry.textContent = 'BREAKER: CLOSED | 230V | 50.0 Hz';
+                subTelemetry.setAttribute('fill', 'var(--neutral-slate)');
+                mimicGridBadge.textContent = 'GRID-TIED (230V AC)';
+                mimicGridBadge.style.color = 'var(--battery-green)';
+                mimicGridBadge.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+                mimicGridBadge.style.background = 'rgba(16, 185, 129, 0.12)';
+
+                if (cur.gridImport > 0) {
+                    feederLine.setAttribute('stroke', 'var(--grid-rose)');
+                    feederLine.setAttribute('class', 'power-flow-anim');
+                } else if (cur.gridExport > 0) {
+                    feederLine.setAttribute('stroke', 'var(--battery-green)');
+                    feederLine.setAttribute('class', 'power-flow-anim');
+                } else {
+                    feederLine.setAttribute('stroke', 'rgba(255,255,255,0.2)');
+                    feederLine.removeAttribute('class');
+                }
+            }
+
+            // 2. P2P Energy Flow Particles
+            if (cur.p2p > 0) {
+                p2pMeshPath.setAttribute('stroke', 'var(--p2p-cyan)');
+                p2pMeshPath.setAttribute('stroke-width', '3.5');
+                p2pMeshPath.setAttribute('class', 'power-flow-anim');
+                p2pMeshPath.setAttribute('filter', 'url(#glow-cyan)');
+            } else {
+                p2pMeshPath.setAttribute('stroke', 'rgba(255,255,255,0.1)');
+                p2pMeshPath.setAttribute('stroke-width', '2');
+                p2pMeshPath.removeAttribute('class');
+                p2pMeshPath.removeAttribute('filter');
+            }
+
+            // 3. Update Individual Household Nodes
+            if (cur.nodes && cur.nodes.length >= 3) {
+                const nodesData = [
+                    { id: 'ha', data: cur.nodes[0] },
+                    { id: 'hb', data: cur.nodes[1] },
+                    { id: 'hc', data: cur.nodes[2] }
+                ];
+
+                nodesData.forEach(item => {
+                    const n = item.data;
+                    const id = item.id;
+
+                    const frame = document.getElementById(`frame-${id}`);
+                    const socBar = document.getElementById(`soc-bar-${id}`);
+                    const socTxt = document.getElementById(`soc-txt-${id}`);
+                    const rSolar = document.getElementById(`readout-solar-${id}`);
+                    const rLoad = document.getElementById(`readout-load-${id}`);
+                    const badgeBg = document.getElementById(`badge-bg-${id}`);
+                    const badgeTxt = document.getElementById(`badge-txt-${id}`);
+
+                    // Text values
+                    socTxt.textContent = `SOC ${n.soc.toFixed(0)}%`;
+                    rSolar.textContent = `☀️ PV: ${n.solar.toFixed(2)} kW`;
+                    rLoad.textContent = `🏠 Load: ${n.demand.toFixed(2)} kW`;
+
+                    // SOC Bar width (max width 130)
+                    const w = Math.max(4, (n.soc / 100) * 130);
+                    socBar.setAttribute('width', w.toFixed(1));
+
+                    if (n.state === 'SURPLUS') {
+                        frame.setAttribute('stroke', 'var(--battery-green)');
+                        badgeBg.setAttribute('fill', 'rgba(16, 185, 129, 0.15)');
+                        badgeTxt.setAttribute('fill', 'var(--battery-green)');
+                        if (cur.p2p > 0 && id === 'hb') {
+                            badgeTxt.textContent = 'SURPLUS (P2P SELLER)';
+                        } else if (n.soc < 98) {
+                            badgeTxt.textContent = 'SURPLUS (CHARGING BESS)';
+                        } else {
+                            badgeTxt.textContent = 'SURPLUS (GRID EXPORT)';
+                        }
+                    } else if (n.state === 'DEFICIT') {
+                        frame.setAttribute('stroke', 'var(--grid-red)');
+                        badgeBg.setAttribute('fill', 'rgba(239, 68, 68, 0.15)');
+                        badgeTxt.setAttribute('fill', 'var(--grid-red)');
+                        if (cur.p2p > 0 && id === 'ha') {
+                            badgeTxt.textContent = 'DEFICIT (P2P BUYER)';
+                        } else if (n.soc > 5) {
+                            badgeTxt.textContent = 'DEFICIT (BESS DISCHARGE)';
+                        } else if (cur.gridImport > 0) {
+                            badgeTxt.textContent = 'DEFICIT (GRID IMPORT)';
+                        } else {
+                            badgeTxt.textContent = 'DEFICIT (UNMET)';
+                        }
+                    } else {
+                        frame.setAttribute('stroke', 'var(--p2p-cyan)');
+                        badgeBg.setAttribute('fill', 'rgba(0, 229, 255, 0.15)');
+                        badgeTxt.setAttribute('fill', 'var(--p2p-cyan)');
+                        badgeTxt.textContent = 'BALANCED (SELF-CONSUME)';
+                    }
+                });
+            }
+        }
+
+        // --- Dynamic Multi-Agent Fleet Rendering (Scales to 3, 10, 25, 50 Households) ---
+        function renderAgentFleet(nodes) {
+            const container = document.getElementById('agent-fleet-container');
+            const countBadge = document.getElementById('agent-count-badge');
+            if (!container) return;
+            if (!nodes || nodes.length === 0) {
+                container.innerHTML = '<div style="color:var(--neutral-dim); font-family:var(--font-mono); padding:10px;">No agent telemetry recorded for this timestep.</div>';
+                return;
+            }
+
+            if (countBadge) {
+                countBadge.textContent = `${nodes.length} Household Prosumers`;
+            }
+
+            container.innerHTML = nodes.map(node => {
+                const stateClass = (node.state || 'balanced').toLowerCase();
+                const soc = Math.max(0, Math.min(100, node.soc != null ? node.soc : 0));
+                const action = node.action || 'CONSUME';
+                let actionColor = 'var(--neutral-white)';
+                if (action === 'CHARGE') actionColor = 'var(--battery-green)';
+                else if (action === 'DISCHARGE') actionColor = 'var(--solar-gold)';
+                else if (action === 'BUY') actionColor = 'var(--grid-red)';
+                else if (action === 'SELL') actionColor = 'var(--p2p-cyan)';
+
+                const p2pInfo = (node.p2pBought > 0) ? `P2P Bought: +${node.p2pBought.toFixed(2)}` :
+                               (node.p2pSold > 0) ? `P2P Sold: -${node.p2pSold.toFixed(2)}` :
+                               `Batt Flow: ${(node.batteryFlow || 0).toFixed(2)} kW`;
+
+                return `
+                    <div class="agent-node-card ${stateClass}">
+                        <div class="agent-card-header">
+                            <span class="agent-card-title">${node.fullName || ('Household ' + node.name)}</span>
+                            <span class="agent-badge-pill ${stateClass}">${node.state}</span>
+                        </div>
+                        <div class="agent-soc-row">
+                            <div class="agent-soc-label">
+                                <span>BATTERY SOC</span>
+                                <span style="font-weight:700; color:var(--neutral-white);">${soc.toFixed(1)}%</span>
+                            </div>
+                            <div class="agent-soc-bar-bg">
+                                <div class="agent-soc-bar-fill" style="width: ${soc}%;"></div>
+                            </div>
+                        </div>
+                        <div class="agent-metrics-row">
+                            <div class="agent-metric-item">PV: <span>${node.solar.toFixed(2)} kW</span></div>
+                            <div class="agent-metric-item">Load: <span>${node.demand.toFixed(2)} kW</span></div>
+                            <div class="agent-metric-item">Action: <span style="color:${actionColor}; font-weight:700;">${action}</span></div>
+                            <div class="agent-metric-item"><span style="color:var(--neutral-dim); font-size:0.7rem;">${p2pInfo}</span></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // --- Live FIPA Contract-Net Protocol (CNP) Terminal ---
+        function updateFipaConsole(cur) {
+            const feed = document.getElementById('fipa-terminal-log');
+            const t = `${cur.hour.toString().padStart(2, '0')}:00`;
+            const rows = [];
+
+            // Step Initializer Row
+            rows.push(`
+                <div class="fipa-msg-row">
+                    <span class="fipa-timestamp">[${t}:00]</span>
+                    <span class="fipa-actor">DISCRETE_STEP:</span> 
+                    <span>Hour ${cur.hour} initialized | TOU Rate: Rs. ${cur.touRate.toFixed(1)}/kWh | Grid: ${cur.gridAvailable ? 'CONNECTED (230V)' : 'ISLANDED (0V)'}</span>
+                </div>
+            `);
+
+            // Environmental Shock Alerts
+            if (cur.shock === 'outage') {
+                rows.push(`
+                    <div class="fipa-msg-row outage">
+                        <span class="fipa-timestamp">[${t}:02]</span>
+                        <span class="fipa-actor">SCADA_SENSOR:</span> 
+                        <span class="fipa-verb" style="color:var(--grid-red);">GRID_BLACKOUT_TRIP</span> 
+                        <span>Substation intertie disconnected. Autonomous islanding initiated.</span>
+                    </div>
+                `);
+            } else if (cur.shock === 'cloud') {
+                rows.push(`
+                    <div class="fipa-msg-row cfp">
+                        <span class="fipa-timestamp">[${t}:02]</span>
+                        <span class="fipa-actor">SCADA_SENSOR:</span> 
+                        <span class="fipa-verb cfp">CLOUD_COVER_ALARM</span> 
+                        <span>Solar generation attenuated (0.4× multiplier / 60% drop). Prosumers activating battery discharge.</span>
+                    </div>
+                `);
+            } else if (cur.shock === 'peak') {
+                rows.push(`
+                    <div class="fipa-msg-row propose">
+                        <span class="fipa-timestamp">[${t}:02]</span>
+                        <span class="fipa-actor">SCADA_SENSOR:</span> 
+                        <span class="fipa-verb propose">PEAK_DEMAND_SURGE</span> 
+                        <span>Residential load surged (1.5× multiplier / +50%). P2P negotiation protocol mitigating grid tariff penalty.</span>
+                    </div>
+                `);
+            }
+
+            // Real FIPA ACL Packets from Simulation Telemetry
+            if (cur.messages && cur.messages.length > 0) {
+                cur.messages.forEach((msg, idx) => {
+                    const sec = (5 + (idx * 3) % 50).toString().padStart(2, '0');
+                    const sender = msg.sender.replace('Household ', 'H_');
+                    const receiver = msg.receiver === 'BROADCAST' ? 'PEER_MESH' : msg.receiver.replace('Household ', 'H_');
+                    const type = msg.type;
+                    const meta = msg.metadata || {};
+
+                    if (type === 'SURPLUS') {
+                        rows.push(`
+                            <div class="fipa-msg-row">
+                                <span class="fipa-timestamp">[${t}:${sec}]</span>
+                                <span class="fipa-actor">${sender} ➔ ${receiver}:</span> 
+                                <span class="fipa-verb" style="color:var(--battery-green);">BROADCAST_SURPLUS</span> 
+                                <span>Announced ${msg.amount.toFixed(2)} kW available energy (State: SURPLUS)</span>
+                            </div>
+                        `);
+                    } else if (type === 'DEFICIT') {
+                        rows.push(`
+                            <div class="fipa-msg-row">
+                                <span class="fipa-timestamp">[${t}:${sec}]</span>
+                                <span class="fipa-actor">${sender} ➔ ${receiver}:</span> 
+                                <span class="fipa-verb" style="color:var(--grid-red);">BROADCAST_DEFICIT</span> 
+                                <span>Announced ${msg.amount.toFixed(2)} kW deficit requirement (State: DEFICIT)</span>
+                            </div>
+                        `);
+                    } else if (type === 'REQUEST') {
+                        const maxP = meta.max_price_per_kwh != null ? ` (Price Cap: Rs.${Number(meta.max_price_per_kwh).toFixed(1)}/kWh)` : '';
+                        rows.push(`
+                            <div class="fipa-msg-row cfp">
+                                <span class="fipa-timestamp">[${t}:${sec}]</span>
+                                <span class="fipa-actor">${sender} ➔ ${receiver}:</span> 
+                                <span class="fipa-verb cfp">CFP_REQUEST</span> 
+                                <span>Soliciting ${msg.amount.toFixed(2)} kWh energy transfer${maxP}</span>
+                            </div>
+                        `);
+                    } else if (type === 'OFFER') {
+                        const price = meta.price_per_kwh != null ? ` @ Rs.${Number(meta.price_per_kwh).toFixed(2)}/kWh` : '';
+                        rows.push(`
+                            <div class="fipa-msg-row propose">
+                                <span class="fipa-timestamp">[${t}:${sec}]</span>
+                                <span class="fipa-actor">${sender} ➔ ${receiver}:</span> 
+                                <span class="fipa-verb propose">PROPOSE_OFFER</span> 
+                                <span>Tendering ${msg.amount.toFixed(2)} kWh surplus${price}</span>
+                            </div>
+                        `);
+                    } else if (type === 'ACCEPT') {
+                        const price = meta.price_per_kwh != null ? ` @ Rs.${Number(meta.price_per_kwh).toFixed(2)}/kWh` : '';
+                        rows.push(`
+                            <div class="fipa-msg-row accept">
+                                <span class="fipa-timestamp">[${t}:${sec}]</span>
+                                <span class="fipa-actor">${sender} ➔ ${receiver}:</span> 
+                                <span class="fipa-verb accept">ACCEPT_PROPOSAL</span> 
+                                <span>Confirmed ${msg.amount.toFixed(2)} kWh bilateral contract${price}</span>
+                            </div>
+                        `);
+                    } else if (type === 'REJECT') {
+                        const reason = meta.reason ? `: ${meta.reason}` : '';
+                        rows.push(`
+                            <div class="fipa-msg-row outage">
+                                <span class="fipa-timestamp">[${t}:${sec}]</span>
+                                <span class="fipa-actor">${sender} ➔ ${receiver}:</span> 
+                                <span class="fipa-verb outage">REJECT_PROPOSAL</span> 
+                                <span>Declined offer${reason}</span>
+                            </div>
+                        `);
+                    }
+                });
+            }
+
+            // Real Settled Transactions
+            if (cur.trades && cur.trades.length > 0) {
+                cur.trades.forEach((trade, idx) => {
+                    const sec = (45 + idx * 2).toString().padStart(2, '0');
+                    const b = trade.buyer.replace('Household ', 'H_');
+                    const s = trade.seller.replace('Household ', 'H_');
+                    rows.push(`
+                        <div class="fipa-msg-row settle">
+                            <span class="fipa-timestamp">[${t}:${sec}]</span>
+                            <span class="fipa-actor">P2P_CLEARING:</span> 
+                            <span class="fipa-verb settle">CONTRACT_SETTLED</span> 
+                            <span>${b} bought ${trade.amount.toFixed(2)} kWh from ${s} @ Rs.${trade.price.toFixed(2)}/kWh (Total: Rs. ${trade.total.toFixed(2)})</span>
+                        </div>
+                    `);
+                });
+            } else if (!cur.messages || cur.messages.length === 0) {
+                if (cur.solar > cur.demand && cur.avgSoc < 95) {
+                    rows.push(`
+                        <div class="fipa-msg-row">
+                            <span class="fipa-timestamp">[${t}:15]</span>
+                            <span class="fipa-actor">LOCAL_TIER_2:</span> 
+                            <span>Surplus generation routed to internal battery charging. No peer negotiation needed.</span>
+                        </div>
+                    `);
+                } else if (cur.gridImport > 0) {
+                    rows.push(`
+                        <div class="fipa-msg-row">
+                            <span class="fipa-timestamp">[${t}:15]</span>
+                            <span class="fipa-actor">FALLBACK_TIER_4:</span> 
+                            <span>Local storage + peer trades exhausted. Inflowing ${cur.gridImport.toFixed(2)} kWh from macro-grid.</span>
+                        </div>
+                    `);
+                } else {
+                    rows.push(`
+                        <div class="fipa-msg-row settle">
+                            <span class="fipa-timestamp">[${t}:15]</span>
+                            <span class="fipa-actor">AUTONOMOUS_BALANCE:</span> 
+                            <span>Neighborhood generation & storage completely satisfies local load. Zero grid reliance.</span>
+                        </div>
+                    `);
+                }
+            }
+
+            feed.innerHTML = rows.join('');
+        }
+
+        // --- High-Resolution Canvas Chart with TOU Tariff Bands ---
+        function renderDispatchChart(hourlyData) {
+            const canvas = document.getElementById('dispatchChart');
+            const ctx = canvas.getContext('2d');
+
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+
+            const w = rect.width;
+            const h = rect.height;
+            const padL = 48, padR = 24, padT = 20, padB = 34;
+            const cw = w - padL - padR;
+            const ch = h - padT - padB;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // Draw TOU Bands in Background
+            for (let i = 0; i < 24; i++) {
+                const x1 = padL + (i / 23) * cw;
+                const x2 = padL + ((i + 1) / 23) * cw;
+                const r = hourlyData[i].touRate;
+
+                if (r >= 8) {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.08)'; // Peak Tariff
+                } else if (r >= 5) {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.015)'; // Normal Tariff
+                } else {
+                    ctx.fillStyle = 'rgba(0, 229, 255, 0.03)'; // Off-Peak Tariff
+                }
+                ctx.fillRect(x1, padT, x2 - x1, ch);
+            }
+
+            // Grid Lines
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let i = 0; i <= 4; i++) {
+                const y = padT + (i / 4) * ch;
+                ctx.moveTo(padL, y);
+                ctx.lineTo(w - padR, y);
+            }
+            ctx.stroke();
+
+            // Find Max Y
+            let maxY = 15;
+            hourlyData.forEach(d => {
+                maxY = Math.max(maxY, d.solar, d.demand, d.gridImport);
+            });
+            maxY = Math.ceil(maxY / 5) * 5;
+
+            // Draw Series Helper
+            const drawCurve = (key, color, isFill, scaleY = maxY, isDashed = false) => {
+                ctx.beginPath();
+                hourlyData.forEach((d, i) => {
+                    const x = padL + (i / 23) * cw;
+                    const y = padT + ch - (d[key] / scaleY) * ch;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+
+                if (isFill) {
+                    const grad = ctx.createLinearGradient(0, padT, 0, padT + ch);
+                    grad.addColorStop(0, 'rgba(245, 158, 11, 0.35)');
+                    grad.addColorStop(1, 'rgba(245, 158, 11, 0.0)');
+                    ctx.lineTo(padL + cw, padT + ch);
+                    ctx.lineTo(padL, padT + ch);
+                    ctx.fillStyle = grad;
+                    ctx.fill();
+                } else {
+                    ctx.save();
+                    if (isDashed) ctx.setLineDash([5, 5]);
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2.2;
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            };
+
+            // 1. Solar Area
+            drawCurve('solar', 'rgba(245, 158, 11, 1)', true);
+            // 2. Grid Import
+            drawCurve('gridImport', '#EF4444', false);
+            // 3. Demand Line
+            drawCurve('demand', '#FFFFFF', false);
+            // 4. Battery SOC (%)
+            drawCurve('avgSoc', '#10B981', false, 100, true);
+
+            // Draw Vertical Current-Hour Scrubber Line
+            const curX = padL + (activeHour / 23) * cw;
+            ctx.strokeStyle = 'var(--p2p-cyan)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(curX, padT);
+            ctx.lineTo(curX, padT + ch);
+            ctx.stroke();
+
+            // Scrubber Cursor Head
+            ctx.fillStyle = 'var(--p2p-cyan)';
+            ctx.beginPath();
+            ctx.arc(curX, padT, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Time Labels on X-Axis
+            ctx.fillStyle = '#64748B';
+            ctx.font = '11px JetBrains Mono';
+            ctx.textAlign = 'center';
+            for (let i = 0; i <= 23; i += 3) {
+                const x = padL + (i / 23) * cw;
+                ctx.fillText(`${i.toString().padStart(2, '0')}:00`, x, h - 10);
+            }
+
+            // Power Labels on Y-Axis
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= 4; i++) {
+                const y = padT + ch - (i / 4) * ch;
+                ctx.fillText(`${(maxY * i / 4).toFixed(0)} kW`, padL - 8, y);
+            }
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
